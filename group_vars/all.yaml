@@ -1,0 +1,7 @@
+ca_key_name: "ca-key.pem"
+key_name: "tls-key.pem"
+cert_name: "tls-cert.pem"
+ca_cert_name: "ca-cert.pem"
+unseal_keys_path: "{{ playbook_dir }}/unseal_keys.yml"
+raft_backend: true
+postgres_backend: false

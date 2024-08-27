@@ -1,0 +1,79 @@
+---
+
+- name: Update package list
+  apt:
+    update_cache: yes
+
+- name: Install GPG and wget
+  apt:
+    state: present
+    name:
+      - gpg
+      - wget
+
+- name: Download hashicorp GPG key
+  get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.gpg
+
+- name: Add HashiCorp GPG key to keyring
+  ansible.builtin.command:
+    cmd: gpg --dearmor --output {{ keyring_path }} /tmp/hashicorp.gpg
+  args:
+    creates: "{{ keyring_path }}"
+
+- name: Add HashiCorp repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by={{ keyring_path }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+    filename: hashicorp
+
+- name: Check if HashiCorp repository file exists
+  stat:
+    path: /etc/apt/sources.list.d/hashicorp.list
+  register: repo_file
+
+- name: Display repository file status
+  debug:
+    msg: "HashiCorp repository file exists: {{ repo_file.stat.exists }}"
+
+- name: Update cache
+  apt:
+    update_cache: yes
+
+- name: Install vault
+  apt:
+    name: vault
+    state: present
+
+- name: Create vault directory for data
+  file:
+    state: directory
+    mode: '0755'
+    owner: vault
+    group: vault
+    path: "{{ vault_data_path }}"
+
+- name: Remove existing vault certs directory if it exists
+  file:
+    path: "{{ certs_dir }}"
+    state: absent
+  when:
+    - certs_dir is defined
+    - certs_dir != ""
+
+- name: Create vault certs directory
+  file:
+    path: "{{ certs_dir }}"
+    state: directory
+    mode: '0755'
+    owner: vault
+    group: vault
+
+- name: Create vault configuration file
+  template:
+    src: vault.hcl.j2
+    dest: "{{ vault_config_file_path }}"
+  vars:
+    vault_servers: "{{ groups['vault_servers'] }}"
+

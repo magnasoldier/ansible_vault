@@ -1,0 +1,87 @@
+---
+
+- name: Remove existing local cert directory if it exists
+  local_action:
+    module: file
+    path: "{{ local_cert_dir }}"
+    state: absent
+  when:
+    - local_cert_dir is defined
+    - local_cert_dir != ""
+
+- name: Create local cert directory
+  local_action:
+    module: file
+    path: "{{ local_cert_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Generate CA key
+  local_action:
+    module: shell
+    cmd: openssl genrsa 2048 > {{ local_cert_dir }}/{{ ca_key_name }}
+  args:
+    creates: "{{ local_cert_dir }}/{{ ca_key_name }}"
+
+- name: Generate CA certificate
+  local_action:
+    module: command
+    cmd: openssl req -new -x509 -nodes -days 3650 -key {{ local_cert_dir }}/{{ ca_key_name }} -out {{ local_cert_dir }}/{{ ca_cert_name }} -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=CommonName"
+  args:
+    creates: "{{ local_cert_dir }}/{{ ca_cert_name }}"
+
+- name: Distribute CA to nodes
+  copy:
+    src: "{{ local_cert_dir }}/{{ ca_cert_name }}"
+    dest: "{{ certs_dir }}/{{ ca_cert_name }}"
+    mode: '0755'
+    owner: "{{ current_user }}"
+    group: "{{ current_group }}"
+#  args:
+#    creates: "{{ certs_dir }}/{{ ca_cert_name }}"
+
+- name: Distribute CA key to nodes
+  copy:
+    src: "{{ local_cert_dir }}/{{ ca_key_name }}"
+    dest: "{{ certs_dir }}/{{ ca_key_name }}"
+    mode: '0644'
+    owner: "{{ current_user }}"
+    group: "{{ current_group }}"
+#  args:
+#    creates: "{{ certs_dir }}/{{ ca_key_name }}"
+
+- name: Delete certs directory
+  local_action:
+    module: file
+    path: "{{ local_cert_dir }}"
+    state: absent
+
+- name: Create SAN config from template
+  template:
+    src: san.cfg.j2
+    dest: "{{ certs_dir }}/san.cfg"
+    mode: '0644'
+    owner: "{{ current_user }}"
+    group: "{{ current_group }}"
+
+- name: Create CSR for each node
+  command:
+    cmd: openssl req -newkey rsa:2048 -nodes -keyout {{ certs_dir }}/{{ key_name }} -out {{ certs_dir }}/vault-csr.pem -subj "/CN={{ inventory_hostname }}.{{ base_domain }}"
+  args:
+    creates:
+    - "{{ certs_dir }}/vault-csr.pem"
+    - "{{ certs_dir }}/{{ key_name }}"
+
+- name: Generate certificates
+  command:
+    cmd: openssl x509 -req -set_serial 01 -days 3650 -in {{ certs_dir }}/vault-csr.pem -out {{ certs_dir }}/{{ cert_name }} -CA {{ certs_dir }}/{{ ca_cert_name }} -CAkey {{ certs_dir }}/{{ ca_key_name }} -extensions v3_ca -extfile {{ certs_dir }}/san.cfg
+  args:
+    creates: "{{ certs_dir }}/{{ cert_name }}"
+
+- name: Grant privileges to user
+  file:
+    path: "{{ certs_dir }}"
+    mode: '0744'
+    owner: "{{ current_user }}"
+    group: "{{ current_group }}"
+    recurse: true

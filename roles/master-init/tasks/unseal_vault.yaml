@@ -1,0 +1,12 @@
+- name: Load Vault keys
+  include_vars:
+    file: "{{ unseal_keys_path }}"
+    name: unseal_keys
+#  no_log: true
+
+- name: Unseal Vault
+  command: vault operator unseal "{{ item }}"
+  loop: "{{ unseal_keys.unseal_keys_b64[:3] }}"
+  environment:
+    VAULT_SKIP_VERIFY: true
+#  no_log: true

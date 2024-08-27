@@ -1,0 +1,29 @@
+cluster_addr  = "https://{{ ansible_host }}:{{ cluster_port }}"
+api_addr      = "https://{{ ansible_host }}:{{ api_port }}"
+disable_mlock = true
+
+ui = true
+
+listener "tcp" {
+    address            = "0.0.0.0:8200"
+    tls_ca_cert_file   = "{{ certs_dir }}/{{ ca_cert_name }}"
+    tls_cert_file      = "{{ certs_dir }}/{{ cert_name }}"
+    tls_key_file       = "{{ certs_dir }}/{{ key_name }}"
+    tls_client_ca_file = "{{ certs_dir }}/{{ ca_cert_name }}"
+}
+
+storage "raft" {
+    path    = "/opt/vault/data"
+    node_id = "{{ inventory_hostname }}.{{ base_domain }}"
+
+    {% for server in groups['vault_servers'] %}
+    retry_join {
+        tls_skip_verify = true
+        leader_tls_servername   = "{{ hostvars[server]['inventory_hostname'] }}.{{ base_domain }}"
+        leader_api_addr         = "https://{{ hostvars[server]['ansible_host'] }}:{{ api_port }}"
+        leader_ca_cert_file     = "{{ certs_dir }}/{{ ca_cert_name }}"
+        leader_client_cert_file = "{{ certs_dir }}/{{ cert_name }}"
+        leader_client_key_file  = "{{ certs_dir }}/{{ key_name }}"
+    }
+    {% endfor %}
+}

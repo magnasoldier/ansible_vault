@@ -1,0 +1,8 @@
+certs_dir: "/etc/vault/ssl"
+current_user: "vault"
+current_group: "vault"
+vault_data_path: "/opt/vault/data"
+vault_config_file_path: "/etc/vault.d/vault.hcl"
+cluster_port: "8201"
+api_port: "8200"
+base_domain: "vault.com"

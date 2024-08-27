@@ -1,0 +1,34 @@
+- name: Check if Vault is initialized
+  command: vault status -format=json
+  register: vault_status_output
+  environment:
+    VAULT_SKIP_VERIFY: true
+  failed_when: vault_status_output.rc != 0 and '"initialized":' not in vault_status_output.stdout
+
+- name: Set vault_init_status variable
+  set_fact:
+    vault_init_status: "{{ (vault_status_output.stdout | from_json).initialized }}"
+
+- name: Stop Vault service
+  service:
+    name: vault
+    state: stopped
+  when: vault_init_status
+
+- name: Remove Vault data for Raft storage backend
+  file:
+    path: "{{ vault_data_path }}/vault.db"
+    state: absent
+  when: vault_init_status
+
+- name: Remove Vault data for Raft storage backend
+  file:
+    path: "{{ vault_data_path }}/raft"
+    state: absent
+  when: vault_init_status
+
+- name: Start Vault service
+  service:
+    name: vault
+    state: started
+  when: vault_init_status
