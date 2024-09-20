@@ -1,15 +1,15 @@
 ---
-- name: Vault installation
-  hosts: vault_servers
-  roles:
-    - vault-install
-
-- name: Certificates generation
-  hosts: vault_servers
-  become: false
-  gather_facts: false
-  roles:
-    - certs-generation
+#- name: Vault installation
+#  hosts: vault_servers
+#  roles:
+#    - vault-install
+#
+#- name: Certificates generation
+#  hosts: vault_servers
+#  become: false
+#  gather_facts: false
+#  roles:
+#    - certs-generation
 
 - name: Master init
   hosts: vault_servers

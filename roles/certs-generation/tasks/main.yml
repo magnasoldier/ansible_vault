@@ -1,14 +1,4 @@
 ---
-
-- name: Remove existing local cert directory if it exists
-  local_action:
-    module: file
-    path: "{{ local_cert_dir }}"
-    state: absent
-  when:
-    - local_cert_dir is defined
-    - local_cert_dir != ""
-
 - name: Create local cert directory
   local_action:
     module: file
@@ -18,15 +8,19 @@
 
 - name: Generate CA key
   local_action:
-    module: shell
-    cmd: openssl genrsa 2048 > {{ local_cert_dir }}/{{ ca_key_name }}
-  args:
-    creates: "{{ local_cert_dir }}/{{ ca_key_name }}"
+    module: openssl_privatekey
+    path: "{{ local_cert_dir }}/{{ ca_key_name }}"
+    size: 2048
 
-- name: Generate CA certificate
+- name: Generate CA Self-Signed Certificate
   local_action:
     module: command
-    cmd: openssl req -new -x509 -nodes -days 3650 -key {{ local_cert_dir }}/{{ ca_key_name }} -out {{ local_cert_dir }}/{{ ca_cert_name }} -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=CommonName"
+    cmd: >
+      openssl req -x509 -new -nodes
+      -key "{{ local_cert_dir }}/{{ ca_key_name }}"
+      -sha256 -days 3650
+      -out "{{ local_cert_dir }}/{{ ca_cert_name }}"
+      -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=CommonName"
   args:
     creates: "{{ local_cert_dir }}/{{ ca_cert_name }}"
 
@@ -37,8 +31,6 @@
     mode: '0755'
     owner: "{{ current_user }}"
     group: "{{ current_group }}"
-#  args:
-#    creates: "{{ certs_dir }}/{{ ca_cert_name }}"
 
 - name: Distribute CA key to nodes
   copy:
@@ -47,14 +39,6 @@
     mode: '0644'
     owner: "{{ current_user }}"
     group: "{{ current_group }}"
-#  args:
-#    creates: "{{ certs_dir }}/{{ ca_key_name }}"
-
-- name: Delete certs directory
-  local_action:
-    module: file
-    path: "{{ local_cert_dir }}"
-    state: absent
 
 - name: Create SAN config from template
   template:
@@ -64,19 +48,31 @@
     owner: "{{ current_user }}"
     group: "{{ current_group }}"
 
-- name: Create CSR for each node
-  command:
-    cmd: openssl req -newkey rsa:2048 -nodes -keyout {{ certs_dir }}/{{ key_name }} -out {{ certs_dir }}/vault-csr.pem -subj "/CN={{ inventory_hostname }}.{{ base_domain }}"
-  args:
-    creates:
-    - "{{ certs_dir }}/vault-csr.pem"
-    - "{{ certs_dir }}/{{ key_name }}"
+- name: Generate private key for each node
+  openssl_privatekey:
+    path: "{{ certs_dir }}/{{ key_name }}"
+    size: 2048
+
+- name: Generate CSR for each node
+  openssl_csr:
+    path: "{{ certs_dir }}/vault-csr.pem"
+    privatekey_path: "{{ certs_dir }}/{{ key_name }}"
+    common_name: "{{ inventory_hostname }}.{{ base_domain }}"
+    subject_alt_name:
+      - "DNS: {{ inventory_hostname }}.{{ base_domain }}"
+      - "IP:{{ ansible_host | trim }}"
+      - "IP:127.0.0.1"
 
 - name: Generate certificates
-  command:
-    cmd: openssl x509 -req -set_serial 01 -days 3650 -in {{ certs_dir }}/vault-csr.pem -out {{ certs_dir }}/{{ cert_name }} -CA {{ certs_dir }}/{{ ca_cert_name }} -CAkey {{ certs_dir }}/{{ ca_key_name }} -extensions v3_ca -extfile {{ certs_dir }}/san.cfg
-  args:
-    creates: "{{ certs_dir }}/{{ cert_name }}"
+  openssl_certificate:
+    path: "{{ certs_dir }}/{{ cert_name }}"
+    csr_path: "{{ certs_dir }}/vault-csr.pem"
+    provider: ownca
+    ownca_path: "{{ certs_dir }}/{{ ca_cert_name }}"
+    ownca_privatekey_path: "{{ certs_dir }}/{{ ca_key_name }}"
+    ownca_not_after: "+3650d"
+    ownca_create_subject_key_identifier: always_create
+    ownca_create_authority_key_identifier: true
 
 - name: Grant privileges to user
   file:

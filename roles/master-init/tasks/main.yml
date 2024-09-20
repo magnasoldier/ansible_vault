@@ -32,16 +32,18 @@
   become: false
 
 - name: Check if Vault is sealed
-  shell: vault status | grep "Sealed" | awk '{print $2}'
+  command: vault status -format=json
   when: inventory_hostname in groups['master']
-  register: vault_seal_status
+  ignore_errors: true
+  register: vault_seal_output
   environment:
     VAULT_SKIP_VERIFY: true
+    VAULT_ADDR: "https://127.0.0.1:8200"
 
 - name: Unseal vault
-  when: vault_seal_status.stdout == "true" and inventory_hostname in groups['master']
+  when: vault_seal_output.rc != 0 and inventory_hostname in groups['master']
   include_tasks: unseal_vault.yaml
 
 - name: Unseal vault (workers)
-  when: vault_seal_status.stdout == "true" and inventory_hostname in groups['workers']
+  when: inventory_hostname in groups['workers']
   include_tasks: unseal_vault.yaml
