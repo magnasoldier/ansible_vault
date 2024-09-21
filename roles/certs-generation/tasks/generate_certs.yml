@@ -1,0 +1,35 @@
+---
+
+- name: Generate private key for each node
+  openssl_privatekey:
+    path: "{{ certs_dir }}/{{ key_name }}"
+    size: 2048
+
+- name: Generate CSR for each node
+  openssl_csr:
+    path: "{{ certs_dir }}/vault-csr.pem"
+    privatekey_path: "{{ certs_dir }}/{{ key_name }}"
+    common_name: "{{ inventory_hostname }}.{{ base_domain }}"
+    subject_alt_name:
+      - "DNS: {{ inventory_hostname }}.{{ base_domain }}"
+      - "IP:{{ ansible_host | trim }}"
+      - "IP:127.0.0.1"
+
+- name: Generate certificates
+  openssl_certificate:
+    path: "{{ certs_dir }}/{{ cert_name }}"
+    csr_path: "{{ certs_dir }}/vault-csr.pem"
+    provider: ownca
+    ownca_path: "{{ certs_dir }}/{{ ca_cert_name }}"
+    ownca_privatekey_path: "{{ certs_dir }}/{{ ca_key_name }}"
+    ownca_not_after: "+3650d"
+    ownca_create_subject_key_identifier: always_create
+    ownca_create_authority_key_identifier: true
+
+- name: Grant privileges to user
+  file:
+    path: "{{ certs_dir }}"
+    mode: '0744'
+    owner: "{{ current_user }}"
+    group: "{{ current_group }}"
+    recurse: true

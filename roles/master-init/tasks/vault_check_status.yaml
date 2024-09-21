@@ -32,3 +32,4 @@
     name: vault
     state: started
   when: vault_init_status
+

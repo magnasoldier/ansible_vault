@@ -1,55 +1,6 @@
 ---
 
-- name: Update package list and install required packages
-  apt:
-    update_cache: yes
-    name:
-      - gpg
-      - wget
-    state: present
+- name: Vault installation
+  include_tasks: vault_repository.yml
 
-- name: Download and add HashiCorp GPG key
-  block:
-    - name: Download HashiCorp GPG key
-      get_url:
-        url: https://apt.releases.hashicorp.com/gpg
-        dest: /tmp/hashicorp.gpg
 
-    - name: Add HashiCorp GPG key to keyring
-      ansible.builtin.shell:
-        cmd: gpg --no-default-keyring --keyring {{ keyring_path }} --import /tmp/hashicorp.gpg
-      args:
-        creates: "{{ keyring_path }}"
-
-- name: Add HashiCorp repository
-  apt_repository:
-    repo: "deb [arch=amd64 signed-by={{ keyring_path }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
-    state: present
-    filename: hashicorp
-    update_cache: yes
-
-- name: Install vault
-  apt:
-    name: vault
-    state: present
-
-- name: Ensure vault directories exist with correct permissions
-  file:
-    path: "{{ item.path }}"
-    state: directory
-    mode: '0755'
-    owner: vault
-    group: vault
-  loop:
-    - { path: "{{ vault_data_path }}" }
-    - { path: "{{ certs_dir }}" }
-
-- name: Create vault configuration file
-  template:
-    src: vault.hcl.j2
-    dest: "{{ vault_config_file_path }}"
-    owner: vault
-    group: vault
-    mode: '0644'
-  vars:
-    vault_servers: "{{ groups['vault_servers'] }}"

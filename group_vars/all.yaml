@@ -1,7 +1,20 @@
+
+# Mark false if you have your own CA. You should place your CA cert and key with the corresponding names like specified below
+### This section will be improved in future versions ###
+generate_ca: true
 ca_key_name: "ca-key.pem"
+ca_cert_name: "ca-cert.pem"
+
+# Change if you want some specific names for generated cert and key
 key_name: "tls-key.pem"
 cert_name: "tls-cert.pem"
-ca_cert_name: "ca-cert.pem"
-unseal_keys_path: "{{ playbook_dir }}/unseal_keys.yml"
+
+unseal_keys_path: "{{ playbook_dir }}/unseal_keys.yml" # or anywhere on your controller node
+
+### Only raft backend allowed in current version ###
 raft_backend: true
 postgres_backend: false
+
+
+# Be careful! If 'true' then existing Vault on your nodes WILL BE REMOVED FOREVER
+reinit_vault: true

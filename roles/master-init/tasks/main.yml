@@ -8,7 +8,7 @@
 
 - name: Check init status and restart if initialized
   include_tasks: vault_check_status.yaml
-  when: raft_backend and not postgres_backend and inventory_hostname in groups['master']
+  when: raft_backend and not postgres_backend and inventory_hostname in groups['master'] and reinit_vault
 
 - name: Initialize Vault
   when: inventory_hostname in groups['master']
@@ -38,7 +38,6 @@
   register: vault_seal_output
   environment:
     VAULT_SKIP_VERIFY: true
-    VAULT_ADDR: "https://127.0.0.1:8200"
 
 - name: Unseal vault
   when: vault_seal_output.rc != 0 and inventory_hostname in groups['master']

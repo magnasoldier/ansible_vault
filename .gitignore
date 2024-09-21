@@ -2,4 +2,5 @@ certs
 unseal_keys.yml
 venv
 .idea
+.git
 hosts.yaml
